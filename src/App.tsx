@@ -1,6 +1,7 @@
 import React from 'react';
 import { PortalProvider, usePortal } from './context/PortalContext';
 import { Header } from './components/Header';
+import { AINavigationBar } from './components/AINavigationBar';
 import { DashboardStudent } from './components/DashboardStudent';
 import { DashboardTeacher } from './components/DashboardTeacher';
 import { DashboardMentor } from './components/DashboardMentor';
@@ -11,10 +12,10 @@ import { AnnouncementsModule } from './components/AnnouncementsModule';
 import { ERPModulesView } from './components/ERPModulesView';
 import { ArchitectureView } from './components/ArchitectureView';
 import { AIChatbotAssistant } from './components/AIChatbotAssistant';
-import { Sparkles, Bot } from 'lucide-react';
+import { Sparkles, Bot, Compass, CheckCircle2 } from 'lucide-react';
 
 const MainContent: React.FC = () => {
-  const { activeTab, currentUser, setAiDrawerOpen } = usePortal();
+  const { activeTab, currentUser, setAiDrawerOpen, navToastMessage } = usePortal();
 
   const renderDashboardByRole = () => {
     switch (currentUser.role) {
@@ -34,6 +35,16 @@ const MainContent: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
       <Header />
+      <AINavigationBar />
+
+      {/* Floating Global Navigation Feedback Toast */}
+      {navToastMessage && (
+        <div className="fixed top-20 right-6 z-50 bg-[#0b2545] dark:bg-amber-500 text-white dark:text-slate-950 px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 border border-amber-400/40 text-xs font-bold animate-in slide-in-from-top-2 duration-200">
+          <Compass className="w-4 h-4 text-amber-400 dark:text-slate-950 animate-spin-slow" />
+          <span>{navToastMessage}</span>
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 dark:text-slate-950 ml-1" />
+        </div>
+      )}
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
         {activeTab === 'dashboard' && renderDashboardByRole()}
@@ -48,19 +59,21 @@ const MainContent: React.FC = () => {
         {activeTab === 'architecture' && <ArchitectureView />}
       </main>
 
-      {/* Floating AI Assistant Trigger */}
-      <button
-        onClick={() => setAiDrawerOpen(true)}
-        aria-label="Open Easwari NavBot AI Navigation Assistant"
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold px-4 py-3 rounded-full shadow-2xl hover:shadow-amber-500/25 transition-all transform hover:scale-105 group cursor-pointer border border-amber-300"
-      >
-        <span className="relative flex h-3 w-3">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-950 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-3 w-3 bg-slate-950"></span>
-        </span>
-        <Sparkles className="w-4 h-4 text-slate-950 group-hover:rotate-12 transition-transform" />
-        <span className="text-xs font-extrabold tracking-wide">NavBot AI</span>
-      </button>
+      {/* Floating AI Assistant Trigger with Tooltip */}
+      <div className="fixed bottom-6 right-6 z-40 flex items-center gap-2">
+        <button
+          onClick={() => setAiDrawerOpen(true)}
+          aria-label="Open Easwari NavBot AI Navigation Assistant"
+          className="flex items-center gap-2 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold px-4 py-3 rounded-full shadow-2xl hover:shadow-amber-500/25 transition-all transform hover:scale-105 group cursor-pointer border border-amber-300"
+        >
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-950 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-slate-950"></span>
+          </span>
+          <Sparkles className="w-4 h-4 text-slate-950 group-hover:rotate-12 transition-transform" />
+          <span className="text-xs font-extrabold tracking-wide">NavBot AI</span>
+        </button>
+      </div>
 
       {/* Slide-out AI Navigation Drawer */}
       <AIChatbotAssistant />

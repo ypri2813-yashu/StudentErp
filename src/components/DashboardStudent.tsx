@@ -33,7 +33,7 @@ export const DashboardStudent: React.FC = () => {
               <span>B.E. Computer Science & Engineering • 3rd Year (Sem 5-B)</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-              Vanakkam, {currentUser.name}! 👋
+              Welcome, {currentUser.name}! 👋
             </h1>
             <p className="text-slate-300 text-sm mt-1 max-w-xl">
               Easwari Engineering College Classroom Hub. Access faculty lecture notes, track On-Duty approvals, and monitor your ERP attendance in real time.

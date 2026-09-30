@@ -42,6 +42,9 @@ interface PortalContextType {
   aiDrawerOpen: boolean;
   setAiDrawerOpen: (open: boolean) => void;
   triggerNotificationBadge: number;
+  navToastMessage: string | null;
+  showNavToast: (msg: string) => void;
+  executeAINavigation: (route: ActiveTab, params?: Record<string, any>, customMsg?: string) => void;
 }
 
 const PortalContext = createContext<PortalContextType | undefined>(undefined);
@@ -65,6 +68,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [navToastMessage, setNavToastMessage] = useState<string | null>(null);
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [isLoadingNotes, setIsLoadingNotes] = useState<boolean>(false);
   const [notesFilter, setNotesFilter] = useState({
@@ -82,6 +86,50 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [erpData, setErpData] = useState<any>(null);
   const [aiDrawerOpen, setAiDrawerOpen] = useState<boolean>(false);
   const [triggerNotificationBadge] = useState<number>(3);
+
+  const showNavToast = (msg: string) => {
+    setNavToastMessage(msg);
+    setTimeout(() => {
+      setNavToastMessage(null);
+    }, 4000);
+  };
+
+  const executeAINavigation = (route: ActiveTab, params?: Record<string, any>, customMsg?: string) => {
+    if (params) {
+      if (params.subjectCode) {
+        setNotesFilter(prev => ({ ...prev, subjectCode: params.subjectCode }));
+      }
+      if (params.unit) {
+        setNotesFilter(prev => ({ ...prev, unit: params.unit }));
+      }
+      if (params.category) {
+        setNotesFilter(prev => ({ ...prev, category: params.category }));
+      }
+      if (params.search) {
+        setNotesFilter(prev => ({ ...prev, search: params.search }));
+      }
+    }
+
+    setActiveTab(route);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    const routeNames: Record<ActiveTab, string> = {
+      'dashboard': 'Home Dashboard',
+      'notes': 'Faculty Notes Module',
+      'od-apply': 'Apply for On-Duty (OD)',
+      'od-track': 'OD Status Tracker',
+      'announcements': 'Class Announcements',
+      'timetable': 'Weekly Timetable',
+      'attendance': 'ERP Attendance Register',
+      'marks': 'Assessment Marks & Scores',
+      'lab': 'Lab Practical Details',
+      'fees': 'Fee Portal & Receipts',
+      'profile': 'Student Profile',
+      'architecture': 'Spring Boot Architecture',
+    };
+
+    showNavToast(customMsg || `Navigated to: ${routeNames[route] || route}`);
+  };
 
   // Sync Dark Mode class with root document
   useEffect(() => {
@@ -288,6 +336,9 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         aiDrawerOpen,
         setAiDrawerOpen,
         triggerNotificationBadge,
+        navToastMessage,
+        showNavToast,
+        executeAINavigation,
       }}
     >
       {children}

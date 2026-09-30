@@ -761,41 +761,36 @@ app.post('/api/ai/navigate', async (req: Request, res: Response) => {
 
   const normalizedQuery = query.toLowerCase().trim();
 
-  // If Gemini API is available, use server-side @google/genai with gemini-3.8-flash (with quick timeout)
+  // If Gemini API is available, call gemini-3.1-flash-lite with quick timeout and instant graceful fallback
   if (ai && process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY') {
     try {
-      const systemPrompt = `You are "Easwari NavBot", the intelligent Campus AI and Navigation Assistant for the Easwari Engineering College (EEC) Integrated Classroom ERP Portal.
-Your job is to answer student, teacher, mentor, and HOD queries with accurate navigation actions, helpful college-specific advice, and direct links to modules.
+      const systemPrompt = `You are "Easwari NavBot", the campus navigation assistant for Easwari Engineering College (EEC).
+Analyze the user's intent and guide them to the correct module in the portal.
 
-The portal consists of:
-Classroom Extension Modules:
-- "notes": Faculty Notes Management (Subject notes, unit 1-5, question banks, PPTs, assignment files)
+Available modules:
+- "notes": Faculty Notes (Machine Learning, Computer Networks, Compiler Design, Units 1-5, Question Banks)
 - "od-apply": On-Duty application form
-- "od-track": On-Duty tracking, approvals, and OD Pass generator
-- "announcements": Class and department announcements, test dates, notices
-- "ai-assistant": The AI assistant view itself
+- "od-track": On-Duty status tracking & pass generator
+- "announcements": Class and department announcements
+- "timetable": Weekly 7-period timetable, Room CS-302
+- "attendance": Subject-wise attendance register (94.2% with OD credit)
+- "marks": Continuous Assessment (CAT-1, CAT-2) marks & CGPA
+- "fees": College fee payments and official receipts
+- "profile": Student ERP profile & credentials
+- "architecture": Spring Boot / MySQL technical architecture
 
-Existing Integrated ERP Modules:
-- "timetable": Weekly 7-period schedule, classroom CS-302, labs
-- "attendance": Subject-wise percentages, OD adjustments, <75% condonation alerts
-- "marks": Internal assessments (CAT-1, CAT-2), Model Exam, Semester CGPA
-- "lab": Lab batches, practical courses (ML Lab, CN Lab)
-- "fees": Tuition, exam, bus fees, and receipts
-- "profile": Student/Faculty ERP profile & credentials
-- "architecture": Spring Boot / MySQL architectural mapping
-
-Respond strictly in valid JSON format with:
+Respond in JSON format:
 {
-  "reply": "Friendly concise answer speaking as EEC Assistant",
-  "targetRoute": "notes" | "od-apply" | "od-track" | "announcements" | "timetable" | "attendance" | "marks" | "lab" | "fees" | "profile" | "architecture" | null,
-  "actionText": "Short button label if navigation is recommended, e.g. 'Open Notes Page', 'Apply OD Now', 'View My Attendance'",
-  "filterParams": { "subject": "Machine Learning", "unit": "Unit 1", "status": "pending" } (or empty object),
-  "quickSuggestions": ["Suggested prompt 1", "Suggested prompt 2"]
+  "reply": "Clear, friendly English guidance speaking as Easwari NavBot",
+  "targetRoute": "notes" | "od-apply" | "od-track" | "announcements" | "timetable" | "attendance" | "marks" | "fees" | "profile" | "architecture" | null,
+  "actionText": "Short button label, e.g., 'Open Notes Page', 'Apply OD Now', 'Check Attendance'",
+  "filterParams": { "subjectCode": "CS3551", "unit": "Unit 1" },
+  "quickSuggestions": ["Where are my notes?", "How do I apply OD?", "Show my pending ODs"]
 }`;
 
       const aiPromise = ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: `User role: ${currentRole || 'STUDENT'}, current page: ${currentRoute || 'dashboard'}. User query: "${query}"`,
+        model: 'gemini-3.1-flash-lite',
+        contents: `User role: ${currentRole || 'STUDENT'}, current page: ${currentRoute || 'dashboard'}. Query: "${query}"`,
         config: {
           systemInstruction: systemPrompt,
           responseMimeType: 'application/json',
@@ -803,22 +798,26 @@ Respond strictly in valid JSON format with:
       });
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('AI generation timeout')), 3000)
+        setTimeout(() => reject(new Error('AI timeout')), 2000)
       );
 
       const aiResponse = (await Promise.race([aiPromise, timeoutPromise])) as any;
-      const parsed = JSON.parse(aiResponse.text || '{}');
-      return res.json(parsed);
+      if (aiResponse?.text) {
+        const parsed = JSON.parse(aiResponse.text.trim());
+        if (parsed.reply) {
+          return res.json(parsed);
+        }
+      }
     } catch (err) {
-      console.warn('Gemini API call timed out or failed, falling back to smart heuristic navigator:', err);
+      console.warn('Gemini API call bypassed or timed out, executing intelligent semantic navigator:', (err as any)?.message);
     }
   }
 
-  // Heuristic Smart Fallback (100% dependable, instant, context-aware)
+  // Comprehensive Semantic Navigation Engine (Instant 0ms Fallback)
   let targetRoute: string | null = null;
   let actionText = '';
   let reply = '';
-  let filterParams = {};
+  let filterParams: Record<string, any> = {};
   const quickSuggestions = [
     'Where are my notes?',
     'How do I apply OD?',
@@ -827,54 +826,141 @@ Respond strictly in valid JSON format with:
     'Show CAT-1 exam marks',
   ];
 
-  if (normalizedQuery.includes('note') || normalizedQuery.includes('material') || normalizedQuery.includes('ppt') || normalizedQuery.includes('question bank') || normalizedQuery.includes('unit')) {
+  if (
+    normalizedQuery.includes('note') ||
+    normalizedQuery.includes('material') ||
+    normalizedQuery.includes('ppt') ||
+    normalizedQuery.includes('question bank') ||
+    normalizedQuery.includes('unit') ||
+    normalizedQuery.includes('study') ||
+    normalizedQuery.includes('syllabus') ||
+    normalizedQuery.includes('handout') ||
+    normalizedQuery.includes('pdf')
+  ) {
     targetRoute = 'notes';
     actionText = 'Open Notes Page';
-    reply = 'Navigating to Faculty Notes! You can view materials organized by Department → Semester → Subject → Faculty → Units (Unit 1 to 5).';
     if (normalizedQuery.includes('ml') || normalizedQuery.includes('machine learning')) {
       filterParams = { subjectCode: 'CS3551' };
-      reply = 'Opening CS3551 Machine Learning notes by Dr. K. Meenakshi. Unit 1, Unit 2 slides and CAT-1 Question Bank are ready for download.';
+      reply = 'Opening CS3551 Machine Learning notes by Dr. K. Meenakshi. Unit 1 and Unit 2 materials, plus the CAT-1 Question Bank, are available for download.';
     } else if (normalizedQuery.includes('cn') || normalizedQuery.includes('network')) {
       filterParams = { subjectCode: 'CS3591' };
-      reply = 'Opening CS3591 Computer Networks notes. Unit 1 Physical and Data Link Layer notes are available.';
+      reply = 'Opening CS3591 Computer Networks materials. Physical and Data Link Layer lecture notes are ready.';
+    } else if (normalizedQuery.includes('compiler') || normalizedQuery.includes('cd')) {
+      filterParams = { subjectCode: 'CS3501' };
+      reply = 'Opening CS3501 Compiler Design notes by Dr. S. Vignesh. Lexical analysis and LEX tools notes are ready.';
+    } else {
+      reply = 'Navigating to Faculty Notes. Materials are categorized by Department → Semester → Subject → Faculty → Units (1 to 5).';
     }
-  } else if (normalizedQuery.includes('apply od') || normalizedQuery.includes('apply on-duty') || normalizedQuery.includes('request od') || normalizedQuery.includes('how do i apply')) {
+  } else if (
+    normalizedQuery.includes('apply od') ||
+    normalizedQuery.includes('apply on-duty') ||
+    normalizedQuery.includes('new od') ||
+    normalizedQuery.includes('request od') ||
+    normalizedQuery.includes('how do i apply') ||
+    normalizedQuery.includes('apply for od') ||
+    normalizedQuery.includes('leave')
+  ) {
     targetRoute = 'od-apply';
     actionText = 'Open OD Application Form';
     reply = 'Opening the On-Duty (OD) application form. You can submit requests for Hackathons, Paper Presentations, Sports, or Symposia with event proof attached.';
-  } else if (normalizedQuery.includes('pending od') || normalizedQuery.includes('track od') || normalizedQuery.includes('od status') || normalizedQuery.includes('my ods') || normalizedQuery.includes('on-duty')) {
+  } else if (
+    normalizedQuery.includes('pending od') ||
+    normalizedQuery.includes('track od') ||
+    normalizedQuery.includes('od status') ||
+    normalizedQuery.includes('my od') ||
+    normalizedQuery.includes('on-duty') ||
+    normalizedQuery.includes('od')
+  ) {
     targetRoute = 'od-track';
     actionText = 'View OD Status Tracker';
-    reply = 'Opening your OD Management dashboard. You currently have 1 application forwarded to HOD (Smart India Hackathon) and 1 Approved (IEEE Conference).';
+    reply = 'Opening your On-Duty Status Tracker. You currently have 1 application forwarded to HOD (Smart India Hackathon) and 1 Approved (IEEE Conference with official pass ready).';
     filterParams = { status: 'Pending' };
-  } else if (normalizedQuery.includes('announcement') || normalizedQuery.includes('notice') || normalizedQuery.includes('circular') || normalizedQuery.includes('seminar')) {
-    targetRoute = 'announcements';
-    actionText = 'View Announcements';
-    reply = 'Here are the latest college notices. Check out the upcoming CAT-1 schedule from Dr. K. Meenakshi and the Guest Lecture on Generative AI.';
-  } else if (normalizedQuery.includes('timetable') || normalizedQuery.includes('schedule') || normalizedQuery.includes('class time') || normalizedQuery.includes('period')) {
-    targetRoute = 'timetable';
-    actionText = 'View Class Timetable';
-    reply = 'Opening your weekly 5th Semester CSE-B Timetable. Period 1 begins at 08:30 AM in Classroom CS-302.';
-  } else if (normalizedQuery.includes('attendance') || normalizedQuery.includes('absent') || normalizedQuery.includes('percentage') || normalizedQuery.includes('condonation')) {
+  } else if (
+    normalizedQuery.includes('attendance') ||
+    normalizedQuery.includes('absent') ||
+    normalizedQuery.includes('present') ||
+    normalizedQuery.includes('percentage') ||
+    normalizedQuery.includes('condonation') ||
+    normalizedQuery.includes('att')
+  ) {
     targetRoute = 'attendance';
-    actionText = 'Check Attendance';
-    reply = 'Your overall attendance is 88.4% (94.2% with approved OD credit). You are well above the 75% minimum threshold for Anna University autonomous exam eligibility!';
-  } else if (normalizedQuery.includes('mark') || normalizedQuery.includes('cat') || normalizedQuery.includes('score') || normalizedQuery.includes('cgpa') || normalizedQuery.includes('grade')) {
+    actionText = 'Check Attendance Register';
+    reply = 'Your overall attendance is 88.4% (94.2% with approved OD hours added). You comfortably exceed the Anna University 75% minimum threshold for end-semester exam eligibility.';
+  } else if (
+    normalizedQuery.includes('mark') ||
+    normalizedQuery.includes('cat') ||
+    normalizedQuery.includes('score') ||
+    normalizedQuery.includes('cgpa') ||
+    normalizedQuery.includes('grade') ||
+    normalizedQuery.includes('exam') ||
+    normalizedQuery.includes('result')
+  ) {
     targetRoute = 'marks';
     actionText = 'View Assessment Marks';
-    reply = 'Opening your Internal Assessment marks. In CAT-1, you scored 44/50 in Machine Learning and 46/50 in Compiler Design. Your cumulative CGPA is 8.82.';
-  } else if (normalizedQuery.includes('fee') || normalizedQuery.includes('receipt') || normalizedQuery.includes('tuition') || normalizedQuery.includes('bus fee')) {
+    reply = 'Opening your Continuous Assessment (CAT) scores. In CAT-1, you scored 44/50 in Machine Learning and 46/50 in Compiler Design. Your cumulative CGPA is 8.82 with 0 standing arrears.';
+  } else if (
+    normalizedQuery.includes('timetable') ||
+    normalizedQuery.includes('schedule') ||
+    normalizedQuery.includes('period') ||
+    normalizedQuery.includes('class time') ||
+    normalizedQuery.includes('room') ||
+    normalizedQuery.includes('when is')
+  ) {
+    targetRoute = 'timetable';
+    actionText = 'View Class Timetable';
+    reply = 'Opening your weekly 5th Semester CSE-B Timetable. Period 1 commences at 08:30 AM in Classroom CS-302 (TRP Building, 3rd Floor).';
+  } else if (
+    normalizedQuery.includes('fee') ||
+    normalizedQuery.includes('receipt') ||
+    normalizedQuery.includes('tuition') ||
+    normalizedQuery.includes('bus') ||
+    normalizedQuery.includes('payment')
+  ) {
     targetRoute = 'fees';
     actionText = 'Open Fee Portal & Receipts';
-    reply = 'Opening Fee Details. Your Odd Semester 2026-2027 tuition fee and Route 14 bus fee have been fully paid. Digital receipts are available to download.';
-  } else if (normalizedQuery.includes('profile') || normalizedQuery.includes('register number') || normalizedQuery.includes('mentor name')) {
+    reply = 'Opening Fee Details. Your Odd Semester tuition fee (₹85,000) and Route 14 bus fee have been fully paid. Official digital receipts are ready to download.';
+  } else if (
+    normalizedQuery.includes('announcement') ||
+    normalizedQuery.includes('notice') ||
+    normalizedQuery.includes('circular') ||
+    normalizedQuery.includes('seminar') ||
+    normalizedQuery.includes('event')
+  ) {
+    targetRoute = 'announcements';
+    actionText = 'View Announcements';
+    reply = 'Opening Classroom Announcements. You have notices regarding CAT-1 Machine Learning exam portions and an upcoming Microsoft Guest Lecture on Generative AI.';
+  } else if (
+    normalizedQuery.includes('profile') ||
+    normalizedQuery.includes('reg') ||
+    normalizedQuery.includes('roll') ||
+    normalizedQuery.includes('mentor') ||
+    normalizedQuery.includes('coordinator') ||
+    normalizedQuery.includes('hod')
+  ) {
     targetRoute = 'profile';
     actionText = 'View Student Profile';
-    reply = 'Opening your ERP Student Profile (Reg No: 310622104082, CSE-5B, Mentor: Dr. S. Vignesh).';
-  } else if (normalizedQuery.includes('spring boot') || normalizedQuery.includes('backend') || normalizedQuery.includes('mysql') || normalizedQuery.includes('architecture') || normalizedQuery.includes('api')) {
+    reply = 'Opening your ERP Student Profile: Harish Kumar S (Reg No: 310622104082, CSE-5B). Class Coordinator: Dr. S. Vignesh. Head of Department: Dr. G. S. Anandha Mala.';
+  } else if (
+    normalizedQuery.includes('spring') ||
+    normalizedQuery.includes('boot') ||
+    normalizedQuery.includes('backend') ||
+    normalizedQuery.includes('mysql') ||
+    normalizedQuery.includes('architecture') ||
+    normalizedQuery.includes('api') ||
+    normalizedQuery.includes('mongo')
+  ) {
     targetRoute = 'architecture';
     actionText = 'View Spring Boot Architecture';
-    reply = 'Opening the Spring Boot + Spring Security + JWT + MySQL architecture blueprint for this ERP extension layer.';
+    reply = 'Opening the Spring Boot 3.3.x + Spring Security + JWT + MySQL architecture blueprint and REST controller specifications.';
+  } else if (
+    normalizedQuery.includes('hi') ||
+    normalizedQuery.includes('hello') ||
+    normalizedQuery.includes('hey') ||
+    normalizedQuery.includes('help')
+  ) {
+    reply = 'Hello! I am Easwari NavBot, your Campus AI Navigation Assistant. You can ask me "Where are my notes?", "How do I apply OD?", "Show my pending ODs", or "Check attendance", and I will take you directly there.';
+    targetRoute = 'dashboard';
+    actionText = 'Go to Dashboard';
   } else {
     reply = `I am your Easwari Campus AI Navigator. I can take you directly to your Notes, OD Application, Attendance, Marks, Timetable, or Fee Receipts. What would you like to explore?`;
   }
