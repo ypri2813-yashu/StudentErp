@@ -1,0 +1,6 @@
+{
+  "name": "Easwari Engineering College - Classroom ERP Extension",
+  "description": "Integrated Classroom Management System for Easwari Engineering College featuring Faculty Notes, OD Workflow, Announcements, and AI Navigation Assistant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
